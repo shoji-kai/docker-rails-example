@@ -73,6 +73,16 @@ services:
 
   web:
     <<: *default-app
+    depends_on:
+      postgres:
+        condition: "service_started"
+        required: false
+      redis:
+        condition: "service_started"
+        required: false
+      jaeger:
+        condition: "service_started"
+        required: false
     deploy:
       resources:
         limits:
@@ -87,6 +97,9 @@ services:
     ports:
       - "${DOCKER_WEB_PORT_FORWARD:-127.0.0.1:8000}:${PORT:-8000}"
     profiles: ["web"]
+    environment:
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4318"
 
   worker:
     <<: *default-app
@@ -111,6 +124,21 @@ services:
     ports:
       - "${DOCKER_CABLE_PORT_FORWARD:-127.0.0.1:28080}:${CABLE_PORT:-28080}"
     profiles: ["cable"]
+
+  jaeger:
+    deploy:
+      resources:
+        limits:
+          cpus: "${DOCKER_JAEGER_CPUS:-0}"
+          memory: "${DOCKER_JAEGER_MEMORY:-0}"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    image: "jaegertracing/all-in-one:1.76.0"
+    ports:
+      - "${DOCKER_JAEGER_UI_PORT_FORWARD:-127.0.0.1:16686}:16686"
+    profiles: ["jaeger"]
+    restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+    stop_grace_period: "3s"
 
   js:
     <<: *default-assets
